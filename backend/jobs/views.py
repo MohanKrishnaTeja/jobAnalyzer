@@ -56,6 +56,45 @@ Provide ONLY a table with the following columns: "Project Title", "Project Descr
 Do NOT include any introductory text, concluding text, or any other content outside of this table.
 """
 
+JOB_BASED_PROJECT_PROMPT = """
+Based on the following job market summary:
+{job_summary}
+
+Generate a comprehensive project that would make a candidate stand out for these roles.
+The project should:
+1. Address key technical requirements
+2. Demonstrate relevant soft skills
+3. Showcase industry-standard practices
+4. Be suitable for the specified experience level
+5. Include modern technologies mentioned in the requirements
+
+Respond in English (US).
+Provide ONLY a table with the following columns: "Project Title", "Project Description", "Technologies to be Used", "Implementation Brief", "Key Skills Demonstrated", and "% Chance of Shortlisting".
+Do NOT include any introductory text, concluding text, or any other content outside of this table.
+"""
+
+JOB_BASED_MINI_PROJECTS_PROMPT = """
+Based on the following job market summary:
+{job_summary}
+
+Generate 3 mini projects that would help a candidate build their skills for these roles.
+Each project should:
+1. Focus on different aspects of the job requirements
+2. Be completable in 2-4 weeks
+3. Use relevant technologies
+4. Demonstrate practical skills
+
+For each project, provide:
+1. Project Title
+2. Brief Description
+3. Key Skills to Develop
+4. Technologies to Use
+5. Implementation Steps
+6. Expected Learning Outcomes
+
+Format the response as a structured list of projects.
+"""
+
 SKILL_COMPARISON_PROMPT = """
 Compare these two sets of skills:
 Curriculum Skills: {curriculum_skills}
@@ -188,6 +227,28 @@ def generate_job_summary(job_descriptions: List[str]) -> str:
         logger.error(f"Error generating job summary: {e}")
         return f"Error generating job summary: {e}"
 
+def generate_job_based_project(job_summary: str) -> str:
+    if not gemini_model:
+        return "Error: Gemini model not configured"
+    try:
+        prompt = JOB_BASED_PROJECT_PROMPT.format(job_summary=job_summary)
+        response = gemini_model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        logger.error(f"Error generating job-based project: {e}")
+        return f"Error generating job-based project: {e}"
+
+def generate_job_based_mini_projects(job_summary: str) -> str:
+    if not gemini_model:
+        return "Error: Gemini model not configured"
+    try:
+        prompt = JOB_BASED_MINI_PROJECTS_PROMPT.format(job_summary=job_summary)
+        response = gemini_model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        logger.error(f"Error generating job-based mini projects: {e}")
+        return f"Error generating job-based mini projects: {e}"
+
 class CurriculumAnalysisView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = CurriculumAnalysisSerializer(data=request.data)
@@ -284,16 +345,20 @@ class ProjectGenerationView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         skills = serializer.validated_data['skills']
+        job_summary = request.data.get('job_summary')
 
         try:
-            # Generate projects for each skill
-            mini_projects = {}
-            for skill in skills:
-                project = generate_project_for_skill(skill)
-                mini_projects[skill] = project
-
-            # Generate major project combining all skills
-            major_project = generate_major_project(skills)
+            if job_summary:
+                # Generate projects based on job summary
+                major_project = generate_job_based_project(job_summary)
+                mini_projects = generate_job_based_mini_projects(job_summary)
+            else:
+                # Fallback to original skill-based generation
+                mini_projects = {}
+                for skill in skills:
+                    project = generate_project_for_skill(skill)
+                    mini_projects[skill] = project
+                major_project = generate_major_project(skills)
 
             return Response({
                 "mini_projects": mini_projects,
