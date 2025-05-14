@@ -74,6 +74,18 @@ Return ONLY a comma-separated list of job roles. For example: Data Analyst, Busi
 Do NOT include any other text or explanation.
 """
 
+JOB_SUMMARY_PROMPT = """
+Analyze these job descriptions and create a comprehensive summary that includes:
+1. Common technical skills and requirements
+2. Common soft skills and qualifications
+3. Typical responsibilities and duties
+4. Educational requirements
+5. Experience requirements
+
+Format the response as a structured summary with clear sections.
+Here are the job descriptions:
+"""
+
 class CurriculumAnalysisSerializer(serializers.Serializer):
     curriculum_text = serializers.CharField(required=True)
 
@@ -164,6 +176,18 @@ def identify_job_roles(skills: List[str]) -> List[str]:
         logger.error(f"Error identifying job roles: {e}")
         return []
 
+def generate_job_summary(job_descriptions: List[str]) -> str:
+    if not gemini_model:
+        return "Error: Gemini model not configured"
+    try:
+        combined_descriptions = "\n\n".join(job_descriptions)
+        prompt = JOB_SUMMARY_PROMPT + combined_descriptions
+        response = gemini_model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        logger.error(f"Error generating job summary: {e}")
+        return f"Error generating job summary: {e}"
+
 class CurriculumAnalysisView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = CurriculumAnalysisSerializer(data=request.data)
@@ -240,13 +264,13 @@ class JobAnalysisView(APIView):
             # Get top 10-12 job descriptions for analysis
             job_descriptions = top_jobs.head(12)['description'].tolist()
             
-            # Analyze job descriptions to extract common skills
-            common_skills = analyze_job_descriptions(job_descriptions)
+            # Generate comprehensive job summary instead of just common skills
+            job_summary = generate_job_summary(job_descriptions)
 
             return Response({
                 "identified_roles": job_roles,
                 "jobs": formatted_jobs,
-                "common_skills": common_skills
+                "job_summary": job_summary
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
