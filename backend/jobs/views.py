@@ -104,6 +104,13 @@ Identify which skills from the job market are missing in the curriculum.
 Return ONLY a comma-separated list of missing skills. Do not include any other text.
 """
 
+EXTRACT_SKILLS_FROM_SUMMARY_PROMPT = """
+Extract all technical and non-technical skills from the following job market summary.
+Return ONLY a comma-separated list of skills. Do not include any other text.
+Here is the summary:
+{job_summary}
+"""
+
 JOB_ROLE_PROMPT = """
 Based on the following skills:
 {skills}
@@ -249,6 +256,56 @@ def generate_job_based_mini_projects(job_summary: str) -> str:
         logger.error(f"Error generating job-based mini projects: {e}")
         return f"Error generating job-based mini projects: {e}"
 
+def extract_skills_from_summary(job_summary: str) -> List[str]:
+    if not gemini_model:
+        return []
+    try:
+        prompt = EXTRACT_SKILLS_FROM_SUMMARY_PROMPT.format(job_summary=job_summary)
+        response = gemini_model.generate_content(prompt)
+        skills = [skill.strip() for skill in response.text.split(',') if skill.strip()]
+        return skills
+    except Exception as e:
+        logger.error(f"Error extracting skills from summary: {e}")
+        return []
+
+class SkillComparisonSerializer(serializers.Serializer):
+    curriculum_skills = serializers.ListField(
+        child=serializers.CharField(),
+        required=True
+    )
+    job_summary = serializers.CharField(required=True)
+
+class SkillComparisonView(APIView):
+    def post(self, request, *args, **kwargs):
+        serializer = SkillComparisonSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        curriculum_skills = serializer.validated_data['curriculum_skills']
+        job_summary = serializer.validated_data['job_summary']
+
+        try:
+            # Extract skills from job summary
+            job_market_skills = extract_skills_from_summary(job_summary)
+            
+            if not job_market_skills:
+                return Response(
+                    {"error": "Could not extract skills from job summary"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Compare skills
+            missing_skills = compare_skills(curriculum_skills, job_market_skills)
+
+            return Response({
+                "missing_skills": missing_skills,
+                "extracted_job_market_skills": job_market_skills  # Added for transparency
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error in skill comparison: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 class CurriculumAnalysisView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = CurriculumAnalysisSerializer(data=request.data)
@@ -368,20 +425,3 @@ class ProjectGenerationView(APIView):
         except Exception as e:
             logger.error(f"Error in project generation: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-class SkillComparisonView(APIView):
-    def post(self, request, *args, **kwargs):
-        curriculum_skills = request.data.get('curriculum_skills', [])
-        job_market_skills = request.data.get('job_market_skills', [])
-
-        if not curriculum_skills or not job_market_skills:
-            return Response(
-                {"error": "Both curriculum_skills and job_market_skills are required"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        missing_skills = compare_skills(curriculum_skills, job_market_skills)
-
-        return Response({
-            "missing_skills": missing_skills
-        }, status=status.HTTP_200_OK)
