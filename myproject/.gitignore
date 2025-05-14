@@ -1,0 +1,83 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Django stuff:
+*.log
+*.pot
+*.pyc
+*.pyo
+*.sqlite3
+db.sqlite3
+media/
+staticfiles/  # for `collectstatic` output
+*.mo
+
+# Environment variables
+.env
+.env.*
+
+# VSCode or other editor configs
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Virtual environments
+venv/
+env/
+.venv/
+ENV/
+
+# Coverage / testing
+htmlcov/
+coverage.xml
+*.cover
+*.py,cover
+.tox/
+.nox/
+.cache/
+.pytest_cache/
+junit.xml
+
+# pip tools
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Build system
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+
+# Wheels
+*.egg-info/
+.installed.cfg
+*.egg
+*.whl
+
+# MyPy / Pyre / Pylint
+.mypy_cache/
+.pyre/
+.pytype/
+pylint-report.txt
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Docker
+*.pid
+*.pid.lock
