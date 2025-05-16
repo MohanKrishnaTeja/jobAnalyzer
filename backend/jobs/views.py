@@ -11,6 +11,9 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from typing import List, Dict
 from collections import Counter
+from django.http import StreamingHttpResponse
+import json
+import time
 
 # Logging
 logger = logging.getLogger(__name__)
@@ -425,3 +428,129 @@ class ProjectGenerationView(APIView):
         except Exception as e:
             logger.error(f"Error in project generation: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class CompleteAnalysisView(APIView):
+    def get(self, request, *args, **kwargs):
+        curriculum_text = request.GET.get('curriculum_text')
+        if not curriculum_text:
+            return Response(
+                {"error": "curriculum_text is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        def event_stream():
+            try:
+                # Step 1: Extract skills from curriculum
+                yield f"data: {json.dumps({'step': 'extracting_skills', 'message': 'Analyzing your curriculum...'})}\n\n"
+                curriculum_skills = extract_skills_from_text(curriculum_text, CURRICULUM_SKILLS_PROMPT)
+                if not curriculum_skills:
+                    yield f"data: {json.dumps({'error': 'Could not extract skills from curriculum'})}\n\n"
+                    return
+                yield f"data: {json.dumps({'step': 'skills_extracted', 'data': curriculum_skills})}\n\n"
+
+                # Step 2: Identify relevant job roles
+                yield f"data: {json.dumps({'step': 'identifying_roles', 'message': 'Identifying relevant job roles...'})}\n\n"
+                job_roles = identify_job_roles(curriculum_skills)
+                if not job_roles:
+                    yield f"data: {json.dumps({'error': 'Could not identify relevant job roles'})}\n\n"
+                    return
+                yield f"data: {json.dumps({'step': 'roles_identified', 'data': job_roles})}\n\n"
+
+                # Step 3: Fetch jobs for each role, yield fetching_jobs for each
+                yield f"data: {json.dumps({'step': 'fetching_jobs', 'message': 'Fetching relevant job listings...'})}\n\n"
+                job_location = "India"
+                platforms_to_scrape = ["indeed", "linkedin", "google"]
+                all_jobs = pd.DataFrame()
+                results_to_fetch_per_term = 50
+
+                for role in job_roles:
+                    yield f"data: {json.dumps({'step': 'fetching_jobs', 'message': f'Searching for {role} positions...'})}\n\n"
+                    search_term = f"entry level {role}"
+                    jobs_df = scrape_jobs(
+                        site_name=platforms_to_scrape,
+                        search_term=search_term,
+                        location=job_location,
+                        results_wanted=results_to_fetch_per_term,
+                        country_indeed="India",
+                        linkedin_fetch_description=True,
+                        description_format="markdown"
+                    )
+                    if jobs_df is not None and not jobs_df.empty:
+                        if all_jobs.empty:
+                            all_jobs = jobs_df
+                        else:
+                            all_jobs = pd.concat([all_jobs, jobs_df], ignore_index=True)
+
+                if all_jobs.empty:
+                    yield f"data: {json.dumps({'error': 'No jobs found'})}\n\n"
+                    return
+
+                # Step 4: Format jobs and yield jobs_fetched
+                all_jobs.drop_duplicates(subset=['title', 'company', 'location', 'description'], keep='first', inplace=True)
+                top_jobs = all_jobs.head(20)
+                formatted_jobs = []
+                for _, job in top_jobs.iterrows():
+                    job_data = {
+                        "title": job.get("title", "N/A"),
+                        "company": job.get("company", "N/A"),
+                        "location": job.get("location", "N/A"),
+                        "description": job.get("description", "N/A"),
+                        "job_url": job.get("job_url", "N/A"),
+                        "source_platform": job.get("site", "N/A"),
+                        "posted_date": job.get("posted_date", "N/A"),
+                        "salary": job.get("salary", "N/A")
+                    }
+                    formatted_jobs.append(job_data)
+                yield f"data: {json.dumps({'step': 'jobs_fetched', 'data': formatted_jobs})}\n\n"
+
+                # Step 5: Generate job summary
+                yield f"data: {json.dumps({'step': 'generating_summary', 'message': 'Analyzing job requirements...'})}\n\n"
+                job_descriptions = top_jobs.head(12)['description'].tolist()
+                job_summary = generate_job_summary(job_descriptions)
+                yield f"data: {json.dumps({'step': 'summary_generated', 'data': job_summary})}\n\n"
+
+                # Step 6: Analyze skill gaps
+                yield f"data: {json.dumps({'step': 'analyzing_gaps', 'message': 'Analyzing skill gaps...'})}\n\n"
+                job_market_skills = extract_skills_from_summary(job_summary)
+                missing_skills = compare_skills(curriculum_skills, job_market_skills)
+                yield f"data: {json.dumps({'step': 'gaps_analyzed', 'data': {'missing_skills': missing_skills, 'job_market_skills': job_market_skills}})}\n\n"
+
+                # Step 7: Generate projects
+                yield f"data: {json.dumps({'step': 'generating_projects', 'message': 'Generating project recommendations...'})}\n\n"
+                major_project = generate_job_based_project(job_summary)
+                yield f"data: {json.dumps({'step': 'major_project_generated', 'data': major_project})}\n\n"
+                mini_projects = generate_job_based_mini_projects(job_summary)
+                yield f"data: {json.dumps({'step': 'mini_projects_generated', 'data': mini_projects})}\n\n"
+
+                # Step 8: Complete
+                yield f"data: {json.dumps({'step': 'complete', 'message': 'Analysis complete!'})}\n\n"
+
+            except Exception as e:
+                logger.error(f"Error in complete analysis: {e}")
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+        response = StreamingHttpResponse(
+            event_stream(),
+            content_type='text/event-stream'
+        )
+        response['Cache-Control'] = 'no-cache'
+        response['X-Accel-Buffering'] = 'no'
+        response['Access-Control-Allow-Origin'] = '*'
+        response['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+        response['Access-Control-Allow-Headers'] = 'Content-Type, Accept'
+        return response
+
+    def post(self, request, *args, **kwargs):
+        serializer = CurriculumAnalysisSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        curriculum_text = serializer.validated_data['curriculum_text']
+        return Response({"message": "Analysis started"}, status=status.HTTP_200_OK)
+
+    def options(self, request, *args, **kwargs):
+        response = Response()
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type, Accept"
+        return response

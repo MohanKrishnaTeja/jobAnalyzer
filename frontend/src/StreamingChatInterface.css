@@ -1,0 +1,214 @@
+.streaming-chat-interface {
+  display: flex;
+  flex-direction: column;
+  height: 80vh; /* Adjust as needed */
+  max-width: 700px;
+  margin: 20px auto;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  overflow: hidden;
+  font-family: sans-serif;
+  background-color: #2f2f2f; /* Dark background for the chat container */
+  color: #e0e0e0; /* Light text color */
+}
+
+.messages-area {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background-color: #1e1e1e; /* Slightly darker for message area */
+}
+
+.message {
+  padding: 10px 15px;
+  border-radius: 18px;
+  max-width: 70%;
+  word-wrap: break-word;
+}
+
+.message.user {
+  background-color: #007bff; /* Blue for user messages */
+  color: white;
+  align-self: flex-end;
+  border-bottom-right-radius: 5px;
+}
+
+.message.bot {
+  background-color: #4a4a4a; /* Darker grey for bot messages */
+  color: #f0f0f0;
+  align-self: flex-start;
+  border-bottom-left-radius: 5px;
+}
+
+.message.bot .error-message {
+  color: #ff6b6b; /* Red for error messages from bot */
+  font-style: italic;
+}
+
+.message.bot ul {
+  list-style-type: disc;
+  padding-left: 20px;
+}
+
+.message.bot li {
+  margin-bottom: 5px;
+}
+
+/* Markdown specific styling */
+.message.bot h1, .message.bot h2, .message.bot h3 {
+  margin-top: 0.5em;
+  margin-bottom: 0.25em;
+  color: #90caf9; /* Lighter blue for markdown headers */
+}
+
+.message.bot p {
+  margin-bottom: 0.5em;
+}
+
+.message.bot strong {
+  color: #c3e88d; /* Light green for bold text */
+}
+
+.message.bot .markdown-content {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.message.bot .markdown-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+}
+
+.message.bot .markdown-content th,
+.message.bot .markdown-content td {
+  border: 1px solid #555;
+  padding: 8px;
+  text-align: left;
+}
+
+.message.bot .markdown-content th {
+  background-color: #3a3a3a;
+}
+
+.message.bot .markdown-content tr:nth-child(even) {
+  background-color: #2a2a2a;
+}
+
+.message.bot .markdown-content h1,
+.message.bot .markdown-content h2,
+.message.bot .markdown-content h3,
+.message.bot .markdown-content h4 {
+  color: #90caf9;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+}
+
+.message.bot .markdown-content p {
+  margin-bottom: 1em;
+  line-height: 1.5;
+}
+
+.message.bot .markdown-content ul,
+.message.bot .markdown-content ol {
+  margin-left: 1.5em;
+  margin-bottom: 1em;
+}
+
+.message.bot .markdown-content li {
+  margin-bottom: 0.5em;
+}
+
+.message.bot .markdown-content code {
+  background-color: #3a3a3a;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.message.bot .markdown-content pre {
+  background-color: #2a2a2a;
+  padding: 1em;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 1em 0;
+}
+
+.message.bot .markdown-content pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+.message.bot .list-content {
+  width: 100%;
+}
+
+.message.bot .list-content h4 {
+  color: #90caf9;
+  margin-bottom: 0.5em;
+}
+
+.message.bot .list-content ul {
+  list-style-type: disc;
+  padding-left: 1.5em;
+  margin: 0;
+}
+
+.message.bot .list-content li {
+  margin-bottom: 0.5em;
+  line-height: 1.4;
+}
+
+.input-area {
+  display: flex;
+  padding: 10px;
+  border-top: 1px solid #444;
+  background-color: #2f2f2f;
+}
+
+.input-area input[type="text"] {
+  flex-grow: 1;
+  padding: 10px;
+  border: 1px solid #555;
+  border-radius: 20px;
+  margin-right: 10px;
+  background-color: #3b3b3b;
+  color: #e0e0e0;
+  font-size: 1em;
+}
+
+.input-area input[type="text"]::placeholder {
+  color: #888;
+}
+
+.input-area button {
+  padding: 10px 20px;
+  border: none;
+  background-color: #007bff;
+  color: white;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 1em;
+}
+
+.input-area button:hover {
+  background-color: #0056b3;
+}
+
+/* Scrollbar styling for webkit browsers */
+.messages-area::-webkit-scrollbar {
+  width: 8px;
+}
+
+.messages-area::-webkit-scrollbar-track {
+  background: #2f2f2f;
+}
+
+.messages-area::-webkit-scrollbar-thumb {
+  background-color: #555;
+  border-radius: 4px;
+  border: 2px solid #2f2f2f;
+}
