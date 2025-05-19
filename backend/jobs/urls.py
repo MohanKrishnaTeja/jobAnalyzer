@@ -4,7 +4,9 @@ from .views import (
     JobAnalysisView,
     SkillComparisonView,
     ProjectGenerationView,
-    CompleteAnalysisView
+    CompleteAnalysisView,
+    CompleteAnalysisStreamView,
+    complete_analysis_dispatch,  # Add this import
 )
 
 urlpatterns = [
@@ -12,5 +14,5 @@ urlpatterns = [
     path('analyze-jobs/', JobAnalysisView.as_view(), name='analyze-jobs'),
     path('generate-projects/', ProjectGenerationView.as_view(), name='generate-projects'),
     path('compare-skills/', SkillComparisonView.as_view(), name='compare-skills'),
-    path('complete-analysis/', CompleteAnalysisView.as_view(), name='complete-analysis'),
-] 
+    path('complete-analysis/', complete_analysis_dispatch, name='complete-analysis'),  # Use dispatcher
+]

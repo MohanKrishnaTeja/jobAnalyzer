@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Curriculum Analysis Frontend</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #222; color: #eee; padding: 2em; }
+    .container { max-width: 600px; margin: auto; background: #333; padding: 2em; border-radius: 8px; }
+    textarea { width: 100%; height: 100px; margin-bottom: 1em; background: #222; color: #eee; border: 1px solid #555; border-radius: 4px; padding: 0.5em; }
+    button { padding: 0.5em 1.5em; margin-right: 1em; border: none; border-radius: 4px; background: #007bff; color: #fff; cursor: pointer; }
+    button:disabled { background: #555; }
+    pre { background: #111; color: #0f0; padding: 1em; border-radius: 4px; min-height: 200px; margin-top: 1em; white-space: pre-wrap; }
+    label { font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Curriculum Analysis</h2>
+    <label for="curriculum">Enter your curriculum:</label>
+    <textarea id="curriculum" placeholder="Paste your curriculum here..."></textarea>
+    <br>
+    <button id="submitBtn">Submit</button>
+    <button id="viewBtn" disabled>View Analysis</button>
+    <pre id="output"></pre>
+  </div>
+  <script>
+    let lastCurriculum = "";
+
+    document.getElementById('submitBtn').onclick = async function() {
+      const curriculum = document.getElementById('curriculum').value.trim();
+      if (!curriculum) {
+        alert("Please enter your curriculum.");
+        return;
+      }
+      document.getElementById('output').textContent = "Submitting...";
+      document.getElementById('viewBtn').disabled = true;
+
+      try {
+        const res = await fetch('http://localhost:8000/api/jobs/complete-analysis/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ curriculum_text: curriculum })
+        });
+        if (!res.ok) {
+          document.getElementById('output').textContent = "POST failed: " + res.status;
+          return;
+        }
+        lastCurriculum = curriculum;
+        document.getElementById('output').textContent = "Submitted! Now click 'View Analysis' to see the results.";
+        document.getElementById('viewBtn').disabled = false;
+      } catch (err) {
+        document.getElementById('output').textContent = "Error: " + err;
+      }
+    };
+
+    document.getElementById('viewBtn').onclick = function() {
+      if (!lastCurriculum) {
+        alert("Please submit your curriculum first.");
+        return;
+      }
+      document.getElementById('output').textContent = "";
+      document.getElementById('viewBtn').disabled = true;
+
+      const eventSource = new EventSource(
+        'http://localhost:8000/api/jobs/complete-analysis/?curriculum_text=' + encodeURIComponent(lastCurriculum)
+      );
+      eventSource.onmessage = function(event) {
+        document.getElementById('output').textContent += event.data + "\n\n";
+        // Optionally, scroll to bottom
+        document.getElementById('output').scrollTop = document.getElementById('output').scrollHeight;
+        // If step is 'complete', close the stream
+        try {
+          const parsed = JSON.parse(event.data);
+          if (parsed.step === 'complete') {
+            eventSource.close();
+            document.getElementById('viewBtn').disabled = false;
+          }
+        } catch {}
+      };
+      eventSource.onerror = function() {
+        document.getElementById('output').textContent += "\n[Stream ended or error occurred]\n";
+        eventSource.close();
+        document.getElementById('viewBtn').disabled = false;
+      };
+    };
+  </script>
+</body>
+</html>
