@@ -1,19 +1,39 @@
 import React, { useState, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import jsPDF from "jspdf";
+import { CheckCircleIcon, ClockIcon, ArrowPathIcon } from "@heroicons/react/24/solid";
+import { Card, CardHeader, CardTitle, CardContent } from "./components/ui/card";
+import { Button } from "./components/ui/button";
+import { Textarea } from "./components/ui/textarea";
 import "./index.css";
 
 const BACKEND_URL = "http://localhost:8000/api/jobs/complete-analysis/";
+
+const STEPS = [
+  { key: "extracting_skills", label: "Analyzing your curriculum..." },
+  { key: "skills_extracted", label: "Skills extracted" },
+  { key: "identifying_roles", label: "Identifying relevant job roles..." },
+  { key: "roles_identified", label: "Roles identified" },
+  { key: "fetching_jobs", label: "Fetching relevant job listings..." },
+  { key: "jobs_fetched", label: "Jobs fetched" },
+  { key: "generating_summary", label: "Analyzing job requirements..." },
+  { key: "summary_generated", label: "Job summary generated" },
+  { key: "analyzing_gaps", label: "Analyzing skill gaps..." },
+  { key: "gaps_analyzed", label: "Skill gaps analyzed" },
+  { key: "generating_projects", label: "Generating project recommendations..." },
+  { key: "major_project_generated", label: "Major project generated" },
+  { key: "mini_projects_generated", label: "Mini projects generated" },
+  { key: "complete", label: "Analysis complete!" },
+];
 
 function App() {
   const [curriculum, setCurriculum] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [messages, setMessages] = useState([]);
-  const [markdownSections, setMarkdownSections] = useState([]);
+  const [progress, setProgress] = useState([]);
   const outputRef = useRef(null);
 
-  // Scroll to bottom on new message
   React.useEffect(() => {
     if (outputRef.current) {
       outputRef.current.scrollTop = outputRef.current.scrollHeight;
@@ -24,10 +44,10 @@ function App() {
     e.preventDefault();
     if (!curriculum.trim()) return;
     setMessages([]);
+    setProgress([]);
     setSubmitted(false);
     setStreaming(false);
 
-    // POST request
     try {
       const res = await fetch(BACKEND_URL, {
         method: "POST",
@@ -47,7 +67,7 @@ function App() {
   const handleView = () => {
     setMessages([]);
     setStreaming(true);
-    setMarkdownSections([]); // reset
+    setProgress([]);
     const eventSource = new EventSource(
       `${BACKEND_URL}?curriculum_text=${encodeURIComponent(curriculum)}`
     );
@@ -61,7 +81,6 @@ function App() {
           parsed.step === "mini_projects_generated"
         ) {
           msgType = "markdown";
-          setMarkdownSections((prev) => [...prev, parsed.data]);
         } else if (
           parsed.step === "skills_extracted" ||
           parsed.step === "roles_identified" ||
@@ -86,6 +105,12 @@ function App() {
                 : parsed.data || parsed.message || parsed.error,
           },
         ]);
+        // Update progress
+        if (parsed.step) {
+          setProgress((prev) =>
+            prev.includes(parsed.step) ? prev : [...prev, parsed.step]
+          );
+        }
         if (parsed.step === "complete" || parsed.error) {
           eventSource.close();
           setStreaming(false);
@@ -109,11 +134,9 @@ function App() {
     };
   };
 
-  // Convert all parsed messages to plain text for download
   const getAnalysisText = () => {
     return messages.map((msg) => {
       if (msg.type === "markdown") {
-        // Strip markdown formatting for plain text
         return msg.content.replace(/[#*_`>-]/g, "").trim();
       }
       if (msg.type === "list") {
@@ -125,7 +148,6 @@ function App() {
         msg.content.length > 0 &&
         typeof msg.content[0] === "object"
       ) {
-        // Format jobs as a table-like text
         const header = "Title | Company | Location | Source | Posted | Salary | Link\n" +
                        "----- | ------- | -------- | ------ | ------ | ------ | ----";
         const rows = msg.content.map(job =>
@@ -144,7 +166,6 @@ function App() {
       if (msg.type === "error") {
         return "Error: " + msg.content;
       }
-      // Default: text
       return (msg.step ? msg.step + ": " : "") + msg.content;
     }).join("\n\n---\n\n");
   };
@@ -156,7 +177,6 @@ function App() {
       unit: "pt",
       format: "a4"
     });
-    // Split text into lines to fit the page width
     const lines = doc.splitTextToSize(textContent, 500);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(12);
@@ -164,149 +184,203 @@ function App() {
     doc.save("analysis.pdf");
   };
 
+  // Stepper icon helpers
+  const getStepIcon = (step, idx, currentIdx) => {
+    if (step === "complete" && progress.includes("complete")) {
+      return <CheckCircleIcon className="w-5 h-5 text-green-500 inline mr-2" />;
+    }
+    if (idx < currentIdx) {
+      return <CheckCircleIcon className="w-5 h-5 text-green-500 inline mr-2" />;
+    }
+    if (idx === currentStepIdx && step !== "complete") {
+      return <ArrowPathIcon className="w-5 h-5 text-blue-500 animate-spin inline mr-2" />;
+    }
+    return <ClockIcon className="w-5 h-5 text-gray-400 inline mr-2" />;
+  };
+
+  // Find current step index
+  const currentStepIdx = progress.length
+    ? STEPS.findIndex((s) => s.key === progress[progress.length - 1])
+    : 0;
+
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-      <div className="w-full max-w-xl bg-gray-800 rounded-lg shadow-lg p-8">
-        <h2 className="text-2xl font-bold mb-4 text-white">Curriculum Analysis</h2>
-        <form onSubmit={handleSubmit} className="mb-4">
-          <textarea
-            className="w-full h-28 p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Paste your curriculum here..."
-            value={curriculum}
-            onChange={(e) => setCurriculum(e.target.value)}
-            disabled={streaming}
-          />
-          <div className="flex gap-2 mt-2">
-            <button
-              type="submit"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded disabled:bg-gray-600"
-              disabled={streaming}
-            >
-              Submit
-            </button>
-            <button
-              type="button"
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded disabled:bg-gray-600"
-              disabled={!submitted || streaming}
-              onClick={handleView}
-            >
-              View Analysis
-            </button>
-          </div>
-        </form>
-        <div
-          ref={outputRef}
-          className="bg-gray-950 text-green-300 rounded p-4 h-80 overflow-y-auto text-sm"
-        >
-          {messages.length === 0 && (
-            <span className="text-gray-400">
-              {streaming
-                ? "Streaming analysis..."
-                : "Submit your curriculum and click 'View Analysis'."}
-            </span>
-          )}
-          {messages.map((msg, idx) => {
-            // Render markdown (remove className from ReactMarkdown)
-            if (msg.type === "markdown") {
-              return (
-                <div key={idx} className="mb-4 prose prose-invert">
-                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+    <div className="min-h-screen bg-gray-50 font-sans">
+      <main className=" p-4 flex flex-row gap-8">
+        {/* Left: Input Card (30%) */}
+        <div className="">
+          <Card className="mb-8 md:mb-0">
+            <CardHeader>
+              <CardTitle className="text-xl font-semibold text-gray-800">Analyze Your Curriculum</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit}>
+                <Textarea
+                  className="w-full h-32 mb-4"
+                  placeholder="Paste your curriculum text here..."
+                  value={curriculum}
+                  onChange={(e) => setCurriculum(e.target.value)}
+                  disabled={streaming}
+                />
+                <div className="flex gap-3">
+                  <Button
+                    type="submit"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-semibold shadow disabled:bg-gray-400 transition"
+                    disabled={streaming}
+                  >
+                    Analyze
+                  </Button>
+                  <Button
+                    type="button"
+                    className="bg-teal-600 hover:bg-teal-700 text-white px-5 py-2 rounded-lg font-semibold shadow disabled:bg-gray-400 transition"
+                    disabled={!submitted || streaming}
+                    onClick={handleView}
+                  >
+                    View Results
+                  </Button>
+                  {messages.length > 0 && !streaming && (
+                    <Button
+                      className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-lg font-semibold shadow transition"
+                      onClick={handleDownloadParsed}
+                      type="button"
+                    >
+                      Download PDF
+                    </Button>
+                  )}
                 </div>
-              );
-            }
-            // Render list
-            if (msg.type === "list") {
-              return (
-                <div key={idx} className="mb-2">
-                  <ul className="list-disc ml-6">
-                    {msg.content.map((item, i) => (
-                      <li key={i}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            }
-            // Render jobs table if jobs_fetched step
-            if (
-              msg.step === "jobs_fetched" &&
-              Array.isArray(msg.content) &&
-              msg.content.length > 0 &&
-              typeof msg.content[0] === "object"
-            ) {
-              return (
-                <div key={idx} className="overflow-x-auto mb-4">
-                  <table className="min-w-full text-xs text-left text-gray-300">
-                    <thead>
-                      <tr>
-                        <th className="px-2 py-1">Title</th>
-                        <th className="px-2 py-1">Company</th>
-                        <th className="px-2 py-1">Location</th>
-                        <th className="px-2 py-1">Source</th>
-                        <th className="px-2 py-1">Posted</th>
-                        <th className="px-2 py-1">Salary</th>
-                        <th className="px-2 py-1">Description</th>
-                        <th className="px-2 py-1">Link</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {msg.content.map((job, i) => (
-                        <tr key={i} className="border-t border-gray-700">
-                          <td className="px-2 py-1">{job.title}</td>
-                          <td className="px-2 py-1">{job.company}</td>
-                          <td className="px-2 py-1">{job.location}</td>
-                          <td className="px-2 py-1">{job.source_platform}</td>
-                          <td className="px-2 py-1">{job.posted_date}</td>
-                          <td className="px-2 py-1">{job.salary}</td>
-                          <td className="px-2 py-1 max-w-xs">
-                            <div className="prose prose-invert max-w-xs">
-                              <ReactMarkdown>{job.description}</ReactMarkdown>
-                            </div>
-                          </td>
-                          <td className="px-2 py-1">
-                            {job.job_url && (
-                              <a
-                                href={job.job_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-400 underline"
-                              >
-                                View
-                              </a>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              );
-            }
-            // Render error
-            if (msg.type === "error") {
-              return (
-                <div key={idx} className="text-red-400 mb-2">
-                  {msg.content}
-                </div>
-              );
-            }
-            // Default: render as text
-            return (
-              <div key={idx} className="mb-2">
-                {msg.content}
+              </form>
+              <div>
+                <h2 className="text-xl font-semibold mb-4 text-gray-800 mt-6">Analysis Progress</h2>
+                {/* Stepper */}
+                <ol className="mb-6">
+                  {STEPS.map((step, idx) => (
+                    <li
+                      key={step.key}
+                      className={`flex items-center mb-2 ${
+                        idx === currentStepIdx && progress.includes(step.key)
+                          ? "font-bold text-blue-700"
+                          : idx < currentStepIdx
+                          ? "text-gray-500"
+                          : "text-gray-400"
+                      }`}
+                    >
+                      {getStepIcon(step.key, idx, currentStepIdx)}
+                      {step.label}
+                    </li>
+                  ))}
+                </ol>
               </div>
-            );
-          })}
+            </CardContent>
+          </Card>
         </div>
-        {/* Download parsed analysis button */}
-        {messages.length > 0 && !streaming && (
-          <button
-            className="mt-4 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded"
-            onClick={handleDownloadParsed}
-          >
-            Download Analysis as PDF
-          </button>
-        )}
-      </div>
+        {/* Right: Results Card (70%) */}
+        <div className="w-[70%]">
+          <Card className="min-h-[400px] flex flex-col">
+            <CardHeader>
+              <CardTitle className="text-xl font-semibold text-gray-800">Results</CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1">
+              <div
+                ref={outputRef}
+                className="flex-1 overflow-y-auto text-base text-gray-800"
+              >
+                {messages.length === 0 && (
+                  <span className="text-gray-400">
+                    {streaming
+                      ? "Streaming analysis..."
+                      : "Submit your curriculum and click 'View Results'."}
+                  </span>
+                )}
+                {messages.map((msg, idx) => {
+                  if (msg.type === "markdown") {
+                    return (
+                      <div key={idx} className="mb-4 prose prose-blue max-w-none">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      </div>
+                    );
+                  }
+                  if (msg.type === "list") {
+                    return (
+                      <div key={idx} className="mb-4">
+                        <ul className="list-disc ml-6">
+                          {msg.content.map((item, i) => (
+                            <li key={i}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    );
+                  }
+                  if (
+                    msg.step === "jobs_fetched" &&
+                    Array.isArray(msg.content) &&
+                    msg.content.length > 0 &&
+                    typeof msg.content[0] === "object"
+                  ) {
+                    return (
+                      <div key={idx} className="overflow-x-auto mb-4">
+                        <table className="min-w-full text-xs text-left text-gray-700 border">
+                          <thead>
+                            <tr>
+                              <th className="px-2 py-1 border">Title</th>
+                              <th className="px-2 py-1 border">Company</th>
+                              <th className="px-2 py-1 border">Location</th>
+                              <th className="px-2 py-1 border">Source</th>
+                              <th className="px-2 py-1 border">Posted</th>
+                              <th className="px-2 py-1 border">Salary</th>
+                              <th className="px-2 py-1 border">Description</th>
+                              <th className="px-2 py-1 border">Link</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {msg.content.map((job, i) => (
+                              <tr key={i} className="border-t border-gray-300">
+                                <td className="px-2 py-1 border">{job.title}</td>
+                                <td className="px-2 py-1 border">{job.company}</td>
+                                <td className="px-2 py-1 border">{job.location}</td>
+                                <td className="px-2 py-1 border">{job.source_platform}</td>
+                                <td className="px-2 py-1 border">{job.posted_date}</td>
+                                <td className="px-2 py-1 border">{job.salary}</td>
+                                <td className="px-2 py-1 border max-w-xs">
+                                  <div className="prose prose-blue max-w-xs">
+                                    <ReactMarkdown>{job.description}</ReactMarkdown>
+                                  </div>
+                                </td>
+                                <td className="px-2 py-1 border">
+                                  {job.job_url && (
+                                    <a
+                                      href={job.job_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-blue-600 underline"
+                                    >
+                                      View
+                                    </a>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  }
+                  if (msg.type === "error") {
+                    return (
+                      <div key={idx} className="text-red-500 mb-2">
+                        {msg.content}
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={idx} className="mb-2">
+                      {msg.content}
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </main>
     </div>
   );
 }
