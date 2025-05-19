@@ -351,7 +351,6 @@ function App() {
                               <th className="px-2 py-1 border">Source</th>
                               <th className="px-2 py-1 border">Posted</th>
                               <th className="px-2 py-1 border">Salary</th>
-                              <th className="px-2 py-1 border">Description</th>
                               <th className="px-2 py-1 border">Link</th>
                             </tr>
                           </thead>
@@ -364,11 +363,6 @@ function App() {
                                 <td className="px-2 py-1 border">{job.source_platform}</td>
                                 <td className="px-2 py-1 border">{job.posted_date}</td>
                                 <td className="px-2 py-1 border">{job.salary}</td>
-                                <td className="px-2 py-1 border max-w-xs">
-                                  <div className="prose prose-blue max-w-xs">
-                                    <ReactMarkdown>{job.description}</ReactMarkdown>
-                                  </div>
-                                </td>
                                 <td className="px-2 py-1 border">
                                   {job.job_url && (
                                     <a
