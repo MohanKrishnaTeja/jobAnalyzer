@@ -177,10 +177,27 @@ function App() {
       unit: "pt",
       format: "a4"
     });
-    const lines = doc.splitTextToSize(textContent, 500);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(12);
-    doc.text(lines, 40, 40);
+
+    const marginLeft = 40;
+    const marginTop = 40;
+    const lineHeight = 18;
+    const pageHeight = doc.internal.pageSize.height;
+    const maxLineWidth = 500;
+
+    const lines = doc.splitTextToSize(textContent, maxLineWidth);
+    let cursorY = marginTop;
+
+    lines.forEach(line => {
+      if (cursorY + lineHeight > pageHeight - marginTop) {
+        doc.addPage();
+        cursorY = marginTop;
+      }
+      doc.text(line, marginLeft, cursorY);
+      cursorY += lineHeight;
+    });
+
     doc.save("analysis.pdf");
   };
 
