@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
 import ReactMarkdown from "react-markdown";
+import jsPDF from "jspdf";
 import "./index.css";
 
 const BACKEND_URL = "http://localhost:8000/api/jobs/complete-analysis/";
@@ -108,15 +109,59 @@ function App() {
     };
   };
 
-  const handleDownload = () => {
-    const markdownContent = markdownSections.join("\n\n---\n\n");
-    const blob = new Blob([markdownContent], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "analysis.md";
-    a.click();
-    URL.revokeObjectURL(url);
+  // Convert all parsed messages to plain text for download
+  const getAnalysisText = () => {
+    return messages.map((msg) => {
+      if (msg.type === "markdown") {
+        // Strip markdown formatting for plain text
+        return msg.content.replace(/[#*_`>-]/g, "").trim();
+      }
+      if (msg.type === "list") {
+        return (msg.step ? msg.step + ":\n" : "") + msg.content.map((item) => `- ${item}`).join("\n");
+      }
+      if (
+        msg.step === "jobs_fetched" &&
+        Array.isArray(msg.content) &&
+        msg.content.length > 0 &&
+        typeof msg.content[0] === "object"
+      ) {
+        // Format jobs as a table-like text
+        const header = "Title | Company | Location | Source | Posted | Salary | Link\n" +
+                       "----- | ------- | -------- | ------ | ------ | ------ | ----";
+        const rows = msg.content.map(job =>
+          [
+            job.title,
+            job.company,
+            job.location,
+            job.source_platform,
+            job.posted_date,
+            job.salary,
+            job.job_url
+          ].join(" | ")
+        );
+        return (msg.step ? msg.step + ":\n" : "") + header + "\n" + rows.join("\n");
+      }
+      if (msg.type === "error") {
+        return "Error: " + msg.content;
+      }
+      // Default: text
+      return (msg.step ? msg.step + ": " : "") + msg.content;
+    }).join("\n\n---\n\n");
+  };
+
+  const handleDownloadParsed = () => {
+    const textContent = getAnalysisText();
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "pt",
+      format: "a4"
+    });
+    // Split text into lines to fit the page width
+    const lines = doc.splitTextToSize(textContent, 500);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+    doc.text(lines, 40, 40);
+    doc.save("analysis.pdf");
   };
 
   return (
@@ -252,12 +297,13 @@ function App() {
             );
           })}
         </div>
-        {markdownSections.length > 0 && !streaming && (
+        {/* Download parsed analysis button */}
+        {messages.length > 0 && !streaming && (
           <button
             className="mt-4 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded"
-            onClick={handleDownload}
+            onClick={handleDownloadParsed}
           >
-            Download Markdown
+            Download Analysis as PDF
           </button>
         )}
       </div>

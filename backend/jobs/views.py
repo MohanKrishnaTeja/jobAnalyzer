@@ -522,7 +522,9 @@ class CompleteAnalysisStreamView(View):
                 # Step 7: Generate projects
                 yield f"data: {json.dumps({'step': 'generating_projects', 'message': 'Generating project recommendations...'})}\n\n"
                 major_project = generate_job_based_project(job_summary)
-                yield f"data: {json.dumps({'step': 'major_project_generated', 'data': major_project})}\n\n"
+                # Convert markdown table to point-wise format
+                major_project_points = markdown_table_to_points(major_project)
+                yield f"data: {json.dumps({'step': 'major_project_generated', 'data': major_project_points})}\n\n"
                 mini_projects = generate_job_based_mini_projects(job_summary)
                 yield f"data: {json.dumps({'step': 'mini_projects_generated', 'data': mini_projects})}\n\n"
 
@@ -633,7 +635,9 @@ class CompleteAnalysisView(APIView):
                 # Step 7: Generate projects
                 yield f"data: {json.dumps({'step': 'generating_projects', 'message': 'Generating project recommendations...'})}\n\n"
                 major_project = generate_job_based_project(job_summary)
-                yield f"data: {json.dumps({'step': 'major_project_generated', 'data': major_project})}\n\n"
+                # Convert markdown table to point-wise format
+                major_project_points = markdown_table_to_points(major_project)
+                yield f"data: {json.dumps({'step': 'major_project_generated', 'data': major_project_points})}\n\n"
                 mini_projects = generate_job_based_mini_projects(job_summary)
                 yield f"data: {json.dumps({'step': 'mini_projects_generated', 'data': mini_projects})}\n\n"
 
@@ -677,3 +681,30 @@ def complete_analysis_dispatch(request: HttpRequest, *args, **kwargs):
     else:
         view = CompleteAnalysisView.as_view()
     return view(request, *args, **kwargs)
+
+def markdown_table_to_points(md_table: str) -> str:
+    """
+    Convert a markdown table string to a point-wise project list.
+    """
+    lines = [line.strip() for line in md_table.strip().splitlines() if line.strip()]
+    if len(lines) < 3:
+        return md_table  # Not a table, return as is
+
+    headers = [h.strip() for h in lines[0].split('|')[1:-1]]
+    projects = []
+    for row in lines[2:]:
+        cols = [c.strip() for c in row.split('|')[1:-1]]
+        if len(cols) != len(headers):
+            continue
+        project = {headers[i]: cols[i] for i in range(len(headers))}
+        projects.append(project)
+
+    # Format as point-wise
+    result = []
+    for idx, proj in enumerate(projects, 1):
+        result.append(f"**Project {idx}: {proj.get('Project Title', '')}**")
+        for key, val in proj.items():
+            if key != 'Project Title':
+                result.append(f"- **{key}:** {val}")
+        result.append("")  # Blank line between projects
+    return "\n".join(result)
