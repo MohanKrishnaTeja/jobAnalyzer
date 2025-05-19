@@ -185,8 +185,12 @@ function App() {
   };
 
   // Stepper icon helpers
-  const getStepIcon = (step, idx, currentIdx) => {
-    if (step === "complete" && progress.includes("complete")) {
+  const getStepIcon = (step, idx, currentIdx, progressArr) => {
+    if (progressArr.length === 0) {
+      // Before analysis: all clocks
+      return <ClockIcon className="w-5 h-5 text-gray-400 inline mr-2" />;
+    }
+    if (step === "complete" && progressArr.includes("complete")) {
       return <CheckCircleIcon className="w-5 h-5 text-green-500 inline mr-2" />;
     }
     if (idx < currentIdx) {
@@ -205,9 +209,9 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
-      <main className=" p-4 flex flex-row gap-8">
+      <main className=" p-4 flex flex-row gap-8 h-screen">
         {/* Left: Input Card (30%) */}
-        <div className="">
+        <div className="h-full overflow-y-auto">
           <Card className="mb-8 md:mb-0">
             <CardHeader>
               <CardTitle className="text-xl font-semibold text-gray-800">Analyze Your Curriculum</CardTitle>
@@ -255,15 +259,19 @@ function App() {
                   {STEPS.map((step, idx) => (
                     <li
                       key={step.key}
-                      className={`flex items-center mb-2 ${
-                        idx === currentStepIdx && progress.includes(step.key)
-                          ? "font-bold text-blue-700"
-                          : idx < currentStepIdx
-                          ? "text-gray-500"
-                          : "text-gray-400"
-                      }`}
+                      className={
+                        progress.length === 0
+                          ? "flex items-center mb-2 text-gray-400"
+                          : `flex items-center mb-2 ${
+                              idx === currentStepIdx && progress.includes(step.key)
+                                ? "font-bold text-blue-700"
+                                : idx < currentStepIdx
+                                ? "text-gray-500"
+                                : "text-gray-400"
+                            }`
+                      }
                     >
-                      {getStepIcon(step.key, idx, currentStepIdx)}
+                      {getStepIcon(step.key, idx, currentStepIdx, progress)}
                       {step.label}
                     </li>
                   ))}
@@ -273,7 +281,7 @@ function App() {
           </Card>
         </div>
         {/* Right: Results Card (70%) */}
-        <div className="w-[70%]">
+        <div className="w-[70%] h-full overflow-y-auto">
           <Card className="min-h-[400px] flex flex-col">
             <CardHeader>
               <CardTitle className="text-xl font-semibold text-gray-800">Results</CardTitle>
