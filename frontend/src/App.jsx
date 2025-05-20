@@ -228,7 +228,7 @@ function App() {
     <div className="min-h-screen bg-gray-50 font-sans">
       <main className=" p-4 flex flex-row gap-8 h-screen">
         {/* Left: Input Card (30%) */}
-        <div className="h-full overflow-y-auto">
+        <div className="w-[30%] h-full overflow-y-auto">
           <Card className="mb-8 md:mb-0">
             <CardHeader>
               <CardTitle className="text-xl font-semibold text-gray-800">Analyze Your Curriculum</CardTitle>
